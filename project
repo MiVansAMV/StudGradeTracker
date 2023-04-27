@@ -1,0 +1,121 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+
+	"github.com/go-redis/redis"
+)
+
+// Student represents a student with a name, ID, and courses
+type Student struct {
+	Name      string   `json:"name"`
+	StudentID string   `json:"studentID"`
+	Courses   []Course `json:"courses"`
+}
+
+// Course represents a course with a code and grade
+type Course struct {
+	Code  string `json:"code"`
+	Grade int    `json:"grade"`
+}
+
+// AddCourse adds a course to the student's courses
+func (s *Student) AddCourse(course Course) {
+	s.Courses = append(s.Courses, course)
+}
+
+// ViewCourses displays the student's courses
+func (s *Student) ViewCourses() {
+	for _, course := range s.Courses {
+		fmt.Printf("Course: %s, Grade: %d\n", course.Code, course.Grade)
+	}
+}
+
+// UpdateCourse updates a course in the student's courses
+func (s *Student) UpdateCourse(code string, grade int) {
+	for i, course := range s.Courses {
+		if course.Code == code {
+			s.Courses[i].Grade = grade
+			break
+		}
+	}
+}
+
+// DeleteCourse removes a course from the student's courses
+func (s *Student) DeleteCourse(code string) {
+	for i, course := range s.Courses {
+		if course.Code == code {
+			s.Courses = append(s.Courses[:i], s.Courses[i+1:]...)
+			break
+		}
+	}
+}
+
+// GetCourseCode returns the course code
+func (c Course) GetCourseCode() string {
+	return c.Code
+}
+
+// GetGrade returns the grade
+func (c Course) GetGrade() int {
+	return c.Grade
+}
+
+// StoreStudent stores the student data in Redis
+func StoreStudent(client *redis.Client, student Student) error {
+	jsonData, err := json.Marshal(student)
+	if err != nil {
+		return err
+	}
+	err = client.HSet(student.StudentID, "data", jsonData).Err()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// GetStudent retrieves the student data from Redis
+func GetStudent(client *redis.Client, studentID string) (Student, error) {
+	var student Student
+	jsonData, err := client.HGet(studentID, "data").Bytes()
+	if err != nil {
+		return student, err
+	}
+	err = json.Unmarshal(jsonData, &student)
+	if err != nil {
+		return student, err
+	}
+	return student, nil
+}
+
+// SearchCourses searches for courses by code or grade
+func (s *Student) SearchCourses(searchTerm string) []Course {
+	var searchResults []Course
+	for _, course := range s.Courses {
+		if course.Code == searchTerm || course.Grade == GetGradeFromSearchTerm(searchTerm) {
+			searchResults = append(searchResults, course)
+		}
+	}
+	return searchResults
+}
+
+// SortCourses sorts the courses by code or grade
+func (s *Student) SortCourses(sortBy string) {
+	if sortBy == "code" {
+		sortCoursesByCode(s.Courses)
+	} else if sortBy == "grade" {
+		sortCoursesByGrade(s.Courses)
+	}
+}
+
+func GetGradeFromSearchTerm(searchTerm string) int {
+	grade := 0
+	fmt.Sscanf(searchTerm, "%d", &grade)
+	return grade
+}
+
+func sortCoursesByCode(courses []Course) {
+	for i := 0; i < len(courses); i++ {
+		for j := i + 
